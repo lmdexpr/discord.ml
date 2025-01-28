@@ -2,70 +2,59 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    opam-nix.url = "github:tweag/opam-nix";
   };
-  outputs = { flake-utils, nixpkgs, ... }:
+  outputs = { flake-utils, nixpkgs, opam-nix, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        on   = opam-nix.lib.${system};
 
-        ocamlPackages = pkgs.ocaml-ng.ocamlPackages_5_3;
+        src = ./.;
+        localNames = with builtins;
+          let
+            files      = attrNames (readDir src);
+            opam_files = map (match "(.*)\.opam$") files;
+            non_nulls  = filter (f: !isNull f);
+          in 
+            map (f: elemAt f 0) (non_nulls opam_files);
 
-        dependencies = with ocamlPackages; [
-          yojson
-          ppx_yojson_conv
-          logs
-          hex
-        ];
+        localPackagesQuery = with builtins; 
+          listToAttrs (map (p: { name = p; value = "*"; }) localNames);
 
-        localPackages = rec {
-          sodium = ocamlPackages.buildDunePackage {
-            pname = "sodium";
-            version = "dev";
-            src = pkgs.fetchFromGitHub {
-              owner  = "ahrefs";
-              repo   = "ocaml-sodium";
-              rev    = "734eccbb47e7545a459a504188f1da8dc0bd018e";
-              sha256 = "sha256-anm9sM7xeRdxdwPDpHsKb93Bck6qUWNrw9yEnIPH1n0=";
-            };
-            buildInputs = [
-              pkgs.libsodium
-              ocamlPackages.dune-configurator
-            ];
-            nativeBuildInputs = [ 
-              pkgs.pkg-config
-            ];
-            propagatedBuildInputs = with ocamlPackages; [
-              base
-              ctypes
-            ];
-          };
-
-          discord = ocamlPackages.buildDunePackage {
-            pname = "discord";
-            version = "0.1.0";
-            src = ./.;
-            buildInputs = [ sodium ] ++ dependencies;
-          };
+        devPackagesQuery = {
+          ocaml-lsp-server = "*";
+          ocamlformat = "*";
+          utop = "*";
         };
 
-        devPackages = with pkgs.ocamlPackages; [
-          ocaml-lsp
-          ocamlformat
-        ];
+        query = devPackagesQuery // localPackagesQuery;
+
+        localPackages =
+          on.buildOpamProject'
+          {
+            inherit pkgs;
+            resolveArgs = { with-test = false; with-doc = false; };
+            pinDepends = true;
+          }
+          src
+          query;
+
+        devPackages = builtins.attrValues
+          (pkgs.lib.getAttrs (builtins.attrNames devPackagesQuery) localPackages);
       in
       {
-        legacyPackages = localPackages;
+        legacyPackages = pkgs;
         packages = {
           default = localPackages.discord;
         };
 
         devShells.default =
           pkgs.mkShell {
-            inputsFrom  = builtins.attrValues localPackages;
+            inputsFrom  = builtins.map (p: localPackages.${p}) localNames;
             buildInputs = with pkgs; [ 
               nil nixpkgs-fmt 
-            ] ++ devPackages
-              ++ builtins.attrValues localPackages;
+            ] ++ devPackages;
           };
       });
 }
