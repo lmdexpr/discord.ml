@@ -8,21 +8,6 @@ type type_ =
   | APPLICATION_COMMAND_AUTOCOMPLETE
   | MODAL_SUBMIT
 
-let yojson_of_type_ = function
-  | PING                             -> `Int 1
-  | APPLICATION_COMMAND              -> `Int 2
-  | MESSAGE_COMPONENT                -> `Int 3
-  | APPLICATION_COMMAND_AUTOCOMPLETE -> `Int 4
-  | MODAL_SUBMIT                     -> `Int 5
-
-let type__of_yojson = function
-  | `Int 1 -> PING
-  | `Int 2 -> APPLICATION_COMMAND
-  | `Int 3 -> MESSAGE_COMPONENT
-  | `Int 4 -> APPLICATION_COMMAND_AUTOCOMPLETE
-  | `Int 5 -> MODAL_SUBMIT
-  | _      -> raise (Yojson.Json_error "interaction type")
-
 type snowflake_user = (snowflake * User.t) [@@deriving yojson]
 type snowflake_guild_member = (snowflake * Guild.member) [@@deriving yojson]
 type snowflake_role = (snowflake * Role.t) [@@deriving yojson]
@@ -39,6 +24,22 @@ type resolved = {
   attachments: snowflake_attachment list;
 } [@@yojson.allow_extra_fields] [@@deriving yojson]
 
+
+let yojson_of_type_ = function
+  | PING                             -> `Int 1
+  | APPLICATION_COMMAND              -> `Int 2
+  | MESSAGE_COMPONENT                -> `Int 3
+  | APPLICATION_COMMAND_AUTOCOMPLETE -> `Int 4
+  | MODAL_SUBMIT                     -> `Int 5
+
+let type__of_yojson = function
+  | `Int 1 -> PING
+  | `Int 2 -> APPLICATION_COMMAND
+  | `Int 3 -> MESSAGE_COMPONENT
+  | `Int 4 -> APPLICATION_COMMAND_AUTOCOMPLETE
+  | `Int 5 -> MODAL_SUBMIT
+  | _      -> raise (Yojson.Json_error "interaction type")
+
 module Opt = struct
   type type_ =
     | SUB_COMMAND
@@ -52,6 +53,7 @@ module Opt = struct
     | MENTIONABLE
     | NUMBER
     | ATTACHMENT
+
   let yojson_of_type_ = function
     | SUB_COMMAND       -> `Int 1
     | SUB_COMMAND_GROUP -> `Int 2
@@ -77,7 +79,6 @@ module Opt = struct
     | `Int 10 -> NUMBER
     | `Int 11 -> ATTACHMENT
     | _       -> raise (Yojson.Json_error "option type")
-
   type t = {
     name: string;
     type_: type_ [@key "type"];
@@ -86,16 +87,6 @@ module Opt = struct
     focused: bool option [@yojson.option];
   } [@@yojson.allow_extra_fields] [@@deriving yojson]
 end
-
-type data = {
-  id: snowflake;
-  name: string;
-  type_: int [@key "type"];
-  resolved: resolved option [@yojson.option];
-  options: Opt.t list [@default []];
-  guild_id: snowflake option [@yojson.option];
-  target_id: snowflake option [@yojson.option];
-} [@@yojson.allow_extra_fields] [@@deriving yojson]
 
 open struct
   type inner = Yojson.Safe.t
@@ -118,6 +109,16 @@ let yojson_of_context_type = function
   | GUILD           -> `Int 0
   | BOT_DM          -> `Int 1
   | PRIVATE_CHANNEL -> `Int 2
+
+type data = {
+  id: snowflake;
+  name: string;
+  type_: int [@key "type"];
+  resolved: resolved option [@yojson.option];
+  options: Opt.t list [@default []];
+  guild_id: snowflake option [@yojson.option];
+  target_id: snowflake option [@yojson.option];
+} [@@yojson.allow_extra_fields] [@@deriving yojson]
 
 type t = {
   id: snowflake;
